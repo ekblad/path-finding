@@ -13,5 +13,5 @@ Creates a folder for results (pickled dictionary) and figs based on a trial numb
 
 ### To do:
 2. Episodic semigradient SARSA (Sutton and Barto, pg. 244) - with neural approximation function
-3. Continuous semigradient SARSA (Sutton and Barto, pg. 244) - with linear approximation function
-4. Continuous semigradient SARSA (Sutton and Barto, pg. 244) - with neural approximation function
+3. Continuous semigradient SARSA (Sutton and Barto, pg. 251) - with linear approximation function
+4. Continuous semigradient SARSA (Sutton and Barto, pg. 251) - with neural approximation function
