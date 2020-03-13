@@ -125,17 +125,27 @@ def shortest_path(weighting_scheme,Samples,dir_path,plot=False, all_samples = Tr
 				
 		return 1 - np.mean(accuracy)
 
+def q_linear(weights,state,action_attr,action_dir,action_disc,x_samp):
+	state[action_attr] = state[action_attr] + action_disc*action_dir
+	return np.mean(np.array([np.multiply(weights,np.multiply(state,np.mean(x_s,axis=1))) for x_s in x_samp]),axis=0)
+
+def q_grad_linear(state,action_attr,action_dir,action_disc,x_samp):
+	state[action_attr] = state[action_attr] + action_disc*action_dir
+	return np.mean(np.array([np.multiply(state,np.mean(x_s,axis=1)) for x_s in x_samp]),axis=0)
+
+def q_neural(): # placeholder
+	return 1
+
 def semigradient_sarsa_batch(episodes,Samples,attributes,alpha,gamma,epsilon,batchsize,action_num,action_disc,dir_path,trial=0):    
-	np.random.seed(seed=trial)	
+	np.random.seed(seed=trial)
 	rewards_store = {}
 	states_store = {}
 	actions_store = {}
 	weights_store = {}
-	
-	weights = np.add(np.zeros(attributes)+5,np.random.standard_normal(attributes))	
+	action_mags = np.arange(np.floor(-action_num/2),np.ceil(action_num/2)) # e.g. [-1.  0.  1.]
+	weights = np.add(np.zeros(attributes)+5,np.random.standard_normal(attributes))
 	for episode in range(episodes):
 		term = False
-		i = 0
 
 		alpha_ = alpha
 		rewards = []
@@ -145,58 +155,59 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,alpha,gamma,epsilon,bat
 		states.append(state)
 
 		actions = []
-		action_mags = np.arange(0-int(action_num/2),0+int(action_num/2))
-		action = np.random.choice(action_mags,len(state))*action_disc # init. random
-		actions.append(action)
+		action = (np.random.randint(attributes),np.random.choice(action_mags)) # random init. action
+		action_vect = np.empty((attributes,))
+		action_vect[:] = np.nan
+		action_vect[action[0]] = action[1]
+		actions.append(action_vect)
 		
 		if episode > 0:
-			action_disc = action_disc/episode 
+			action_disc = action_disc/episode # anneal action discretization
+		i = 0
 
 		while term == False:
+			term = True
 			i += 1
-
 			# anneal action discretization
-			action_disc /= i
+			# action_disc /= i
 
-			# epsilon-greedy action selection
-			# switch = np.random.random_sample()
-			# if switch > epsilon:
-			action_prime = np.random.choice(action_mags,len(state))*action_disc
-			# else:
-			# 	# action_prime = -alpha_*np.ones(len(state)) # greedy action, maybe change this
-			# 	action_prime = -action
-			state_prime = np.add(state,action)
-
+			# draw samples for this update
 			samp = np.random.choice(Samples,batchsize)
-			samp_prime = np.random.choice(Samples,batchsize)
-			heuristic = [(heuristics(s_,dir_path),heuristics(s_p,dir_path)) for s_,s_p in zip(samp,samp_prime)]
-			x_samp = [h[0] for h in heuristic]
-			q_hat = np.mean(np.array([np.multiply(weights,np.multiply(state,np.mean(x_s,axis=1))) for x_s in x_samp]),axis=0)
-			x_samp_prime = [h[1] for h in heuristic]
-			q_hat_prime = np.mean(np.array([np.multiply(weights,np.multiply(state_prime,np.mean(x_sp,axis=1))) for x_sp in x_samp_prime]),axis=0)
-			q_grad = np.mean(np.array([np.multiply(state,np.mean(x_s,axis=1)) for x_s in x_samp]),axis=0)
+			x_samp = [heuristics(s_,dir_path) for s_ in samp] # evaluate S and S' on same samples
+			state_prime = state
+			state_prime[action[0]] = state[action[0]]+action[1]*action_disc
+			reward = shortest_path(state,samp,dir_path) #change this to -(1-Accuracy) (i.e. minimize loss)			
 
-			reward = shortest_path(state,samp,dir_path) #change this to -(1-Accuracy) (i.e. minimize loss)
+			if any(action_vect != 0): # checking action for termination criteria is same as checking state it takes you to
+				term = False
+				# epsilon-greedy action selection
+				switch = np.random.random_sample()			
+				if switch > epsilon:
+					action_prime = (np.random.randint(attributes),np.random.choice(action_mags))
+				else:
+					q_store = np.zeros((attributes,len(action_mags)))	
+					for j in np.arange(0,attributes):
+						for k,direction in enumerate(action_mags):
+							q_store[j,k] = q_linear(weights,state_prime,j,direction,action_disc,x_samp)
+					action_prime = np.unravel_index(np.argmax(q_store,axis=None),q_store.shape)
+				q = q_linear(weights,state,action[0],action[1],action_disc,x_samp)
 
-			if any(np.abs(state_prime)-5 > 5): # termination criteria
-				reward -= 1
-				weights_prime = np.add(weights,alpha_*np.multiply(np.subtract(reward,q_hat),q_grad))
-				term = True
-			else:
-				# reward -= 0.1
-				weights_prime = np.add(weights,alpha_*np.multiply(np.add(reward,np.subtract(gamma*q_hat_prime,q_hat)),q_grad))
-			rewards.append(reward)			
-
-			if any(np.abs(weights_prime)-5 > 5):
-				term = True
-			else:			
-				weights = weights_prime
-
-			if term	!= True:
+				q_prime = q_linear(weights,state_prime,action_prime[0],action_prime[1],action_disc,x_samp)
+				q_grad = q_grad_linear(state,action[0],action[1],action_disc,x_samp)
+				print(reward.shape,weights.shape,q.shape,q_prime.shape,q_grad.shape)
+				weights = np.add(weights,alpha_*np.multiply(np.array([reward + gamma * q_prime  - q]),q_grad))
+				
 				state = state_prime
 				states.append(state)
+
 				action = action_prime
-				actions.append(action)
+				action_vect[action[0]] = action[1]
+				actions.append(action_vect)
+
+			else:
+				q = q_linear(weights,state,action[0],action[1],action_disc,x_samp)
+				q_grad = q_grad_linear(state,action[0],action[1],action_disc,x_samp)
+				weights = weights + alpha_*[reward - q] * q_grad			
 
 			# if i > 100:
 			# 	term = True
@@ -205,7 +216,7 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,alpha,gamma,epsilon,bat
 		states_store[episode] = states
 		actions_store[episode] = actions
 		weights_store[episode] = weights
-		
+
 	params = dict(episodes=episodes,samples=Samples,attributes=attributes,alpha=alpha,gamma=gamma,
 			epsilon=epsilon,batchsize=batchsize,action_num=action_num,action_disc=action_disc)
 
@@ -227,7 +238,7 @@ def main():
 	Samples = [sample.strip('\'') for sample in df.Sample_Names]
 
 	#algorithm parameters
-	episodes = 1000 # number of episodes
+	episodes = 100 # number of episodes
 	attributes = 14
 	alpha = 0.01 # initial step size for each episode
 	gamma = 1 # undiscounted
