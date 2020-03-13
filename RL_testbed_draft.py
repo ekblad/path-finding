@@ -148,6 +148,9 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,alpha,gamma,epsilon,bat
 		action_mags = np.arange(0-int(action_num/2),0+int(action_num/2))
 		action = np.random.choice(action_mags,len(state))*action_disc # init. random
 		actions.append(action)
+		
+		if episode > 0:
+			action_disc = action_disc/episode 
 
 		while term == False:
 			i += 1
@@ -195,20 +198,21 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,alpha,gamma,epsilon,bat
 				action = action_prime
 				actions.append(action)
 
-			if i > 100:
-				term = True
+			# if i > 100:
+			# 	term = True
 
 		rewards_store[episode] = rewards
 		states_store[episode] = states
 		actions_store[episode] = actions
 		weights_store[episode] = weights
-		params = dict(episodes=episodes,samples=Samples,attributes=attributes,alpha=alpha,gamma=gamma,
-				epsilon=epsilon,batchsize=batchsize,action_num=action_num,action_disc=action_disc)
+		
+	params = dict(episodes=episodes,samples=Samples,attributes=attributes,alpha=alpha,gamma=gamma,
+			epsilon=epsilon,batchsize=batchsize,action_num=action_num,action_disc=action_disc)
 
-		results = dict(rewards=rewards,states=states,actions=actions,weights=weights,params=params)
-		with open('sarsa_batch_results_{}.pickle'.format(trial), 'wb') as f:
-			# Pickle the results dictionary using the highest protocol available.
-			pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
+	results = dict(rewards=rewards,states=states,actions=actions,weights=weights,params=params)
+	with open('sarsa_batch_results_{}.pickle'.format(trial), 'wb') as f:
+		# Pickle the results dictionary using the highest protocol available.
+		pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
 
 	return weights,rewards_store,states_store,actions_store,weights_store # all indexed/keyed by episode int
 
@@ -223,14 +227,14 @@ def main():
 	Samples = [sample.strip('\'') for sample in df.Sample_Names]
 
 	#algorithm parameters
-	episodes = 100 # number of episodes
+	episodes = 1000 # number of episodes
 	attributes = 14
 	alpha = 0.01 # initial step size for each episode
 	gamma = 1 # undiscounted
 	epsilon = 0.1
 	batchsize = 10 # number of samples at each step
 	action_num = 3 # dimension of action space
-	action_disc = 1 # centered at 0, steps of this to either side
+	action_disc = 0.1 # centered at 0, steps of this to either side
 	trial = 1
 
 	h_list = ['ArcLength', 'EuclideanDistance', 'MinWidth', 'meanWidth', 'inv_meanWidth', 'LongandThick', 'widestBottleneck',
