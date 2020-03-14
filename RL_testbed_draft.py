@@ -216,7 +216,7 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,alpha,gamma,epsilon,bat
 				weights = weights + np.multiply(alpha_*[reward - q],q_grad)	
 
 			if any(np.abs(weights) > 10):
-				weights[np.abs(weights) > 10] = 0 # unbounded control
+				weights[np.abs(weights) > 10] = np.random.standard_normal() # unbounded control
 			if i > 100:
 				term = True
 
