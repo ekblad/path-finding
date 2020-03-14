@@ -142,9 +142,11 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,alpha,gamma,epsilon,bat
 	states_store = {}
 	actions_store = {}
 	weights_store = {}
-	action_mags = np.arange(np.floor(-action_num/2),np.ceil(action_num/2)) # e.g. [-1.  0.  1.]
-	weights = np.add(np.zeros(attributes)+5,np.random.standard_normal(attributes))
+	action_mags = np.arange(int(-action_num/2),int(action_num/2)+1) # e.g. [-1.  0.  1.]
+	print(action_mags)
+	weights = np.add(np.zeros(attributes),np.random.standard_normal(attributes))
 	for episode in range(episodes):
+		print(episode)
 		term = False
 
 		alpha_ = alpha
@@ -164,12 +166,14 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,alpha,gamma,epsilon,bat
 		if episode > 0:
 			action_disc = action_disc/episode # anneal action discretization
 		i = 0
-
+		epsilon = 0
 		while term == False:
 			term = True
 			i += 1
+			
 			# anneal action discretization
-			# action_disc /= i
+			action_disc -= 1/100
+			epsilon += 1/100
 
 			# draw samples for this update
 			samp = np.random.choice(Samples,batchsize)
@@ -188,29 +192,33 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,alpha,gamma,epsilon,bat
 					q_store = np.zeros((attributes,len(action_mags)))	
 					for j in np.arange(0,attributes):
 						for k,direction in enumerate(action_mags):
-							q_store[j,k] = q_linear(weights,state_prime,j,direction,action_disc,x_samp)
-					action_prime = np.unravel_index(np.argmax(q_store,axis=None),q_store.shape)
+							q_store[j,k] = np.sum(q_linear(weights,state_prime,j,direction,action_disc,x_samp))
+					action_prime = np.unravel_index(q_store.argmax(),q_store.shape)
+					if action_prime[1] == 1:
+						action_prime = (q_store.sum(axis=1).argmax(),action_prime[1])
+					# print(action_prime)
 				q = q_linear(weights,state,action[0],action[1],action_disc,x_samp)
-
 				q_prime = q_linear(weights,state_prime,action_prime[0],action_prime[1],action_disc,x_samp)
 				q_grad = q_grad_linear(state,action[0],action[1],action_disc,x_samp)
-				print(reward.shape,weights.shape,q.shape,q_prime.shape,q_grad.shape)
-				weights = np.add(weights,alpha_*np.multiply(np.array([reward + gamma * q_prime  - q]),q_grad))
-				
+				weights = np.add(weights,alpha_*np.multiply(reward + gamma * np.subtract(q_prime,q),q_grad))			
 				state = state_prime
 				states.append(state)
 
 				action = action_prime
 				action_vect[action[0]] = action[1]
+
+				# print(action_vect)
 				actions.append(action_vect)
 
 			else:
 				q = q_linear(weights,state,action[0],action[1],action_disc,x_samp)
 				q_grad = q_grad_linear(state,action[0],action[1],action_disc,x_samp)
-				weights = weights + alpha_*[reward - q] * q_grad			
+				weights = weights + np.multiply(alpha_*[reward - q],q_grad)	
 
-			# if i > 100:
-			# 	term = True
+			if any(np.abs(weights) > 10):
+				weights[np.abs(weights) > 10] = 0 # unbounded control
+			if i > 100:
+				term = True
 
 		rewards_store[episode] = rewards
 		states_store[episode] = states
@@ -240,12 +248,12 @@ def main():
 	#algorithm parameters
 	episodes = 100 # number of episodes
 	attributes = 14
-	alpha = 0.01 # initial step size for each episode
+	alpha = 1. # initial step size for each episode
 	gamma = 1 # undiscounted
-	epsilon = 0.1
-	batchsize = 10 # number of samples at each step
-	action_num = 3 # dimension of action space
-	action_disc = 0.1 # centered at 0, steps of this to either side
+	epsilon = 0.5
+	batchsize = 3 # number of samples at each step
+	action_num = 2 # dimension of action space (not including 0)
+	action_disc = 1.0 # centered at 0, steps of this to either side
 	trial = 1
 
 	h_list = ['ArcLength', 'EuclideanDistance', 'MinWidth', 'meanWidth', 'inv_meanWidth', 'LongandThick', 'widestBottleneck',
