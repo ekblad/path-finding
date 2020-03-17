@@ -110,6 +110,7 @@ def next_actions(state, action_index, action_mags, action_disc):
         actions[0] = np.nan
     elif state[action_index] + actions[-1] > 10:
         actions[-1] = 10 - state[action_index]
+        print('over 10', actions,  state[action_index], action_index)
     elif state[action_index] + actions[0] < 0: 
         actions[0] = -state[action_index]
     return actions    
@@ -130,14 +131,14 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
         states = []
         actions = []
         state = np.random.uniform(0,10,num_attributes) #random initial state
-        states.append(state)
+        states.append(state.copy())
         
         action_vect = np.full((num_attributes,), np.nan)    
         action_index = np.random.randint(num_attributes)
         nextactions = next_actions(state, action_index, action_mags, action_disc)
         action_step = np.random.choice(nextactions[~np.isnan(nextactions)]).astype(np.int) # random init. action
         action_vect[action_index] = action_step
-        actions.append(action_vect)
+        actions.append(action_vect.copy())
         if episode > 0: 
             action_disc = action_disc/episode # anneal action discretization
         i = 0  #reset step count
@@ -156,7 +157,7 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
             x_samp = [Hueristic_df.loc[Hueristic_df['SampleName']==sample, attributes].values[0::2,] for sample in sample_batch]
             
             #evaluate S and S' on same samples
-            state_prime[action_index] = state[action_index] + action_step
+            state_prime[action_index] = state_prime[action_index] + action_step
 
             #determine and store reward for the given state and samples 
             reward = shortest_path(state, sample_batch, Hueristic_df, attributes) #change this to -(1-Accuracy) (i.e. minimize loss)
@@ -198,12 +199,12 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
                 weights = np.add(weights,alpha_func*np.multiply(reward + gamma * np.subtract(q_prime,q),q_grad))
                 
                 state = state_prime
-                states.append(state)
+                states.append(state.copy())
     
                 action_step = action_prime_step
                 action_index = action_prime_index
                 action_vect[action_index] = action_step
-                actions.append(action_vect)
+                actions.append(action_vect.copy())
     
             else:
                 q = q_linear(weights, state, action_index, action_step, x_samp)
@@ -212,7 +213,7 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
     
             if i > 100: #CHANGE BACK TO 100
                 term = True
-    
+
         rewards_store[episode] = rewards
         states_store[episode] = states
         actions_store[episode] = actions
@@ -222,6 +223,7 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
             epsilon=epsilon,batchsize=batchsize,action_num=action_num,action_disc=action_disc)
     
     results = dict(rewards=rewards,states=states,actions=actions,weights=weights,params=params)
+    print(results)
     with open('sarsa_batch_results_{}.pickle'.format(trial), 'wb') as f:
         # Pickle the results dictionary using the highest protocol available.
         pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
