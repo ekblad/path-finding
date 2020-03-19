@@ -290,11 +290,11 @@ def batch():
 	max_steps = 1000
 	trial = 1
 	
-#	local_path = os.path.join(dir_path,'sarsa_batch_results_{}'.format(trial))
-#	if 'sarsa_batch_results_{}'.format(trial) in os.listdir(dir_path):
-#		rmtree('sarsa_batch_results_{}'.format(trial)) # only turn on if need to do again
-#	os.mkdir(local_path, 75)
-#	os.chdir(local_path)
+	local_path = os.path.join(dir_path,'sarsa_batch_results_{}'.format(trial))
+	if 'sarsa_batch_results_{}'.format(trial) in os.listdir(dir_path):
+		rmtree('sarsa_batch_results_{}'.format(trial)) # only turn on if need to do again
+	os.mkdir(local_path, 755)
+	os.chdir(local_path)
 	weights,rewards_store,states_store,actions_store,weights_store = semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_tr,alpha,gamma,epsilon,batchsize,action_num,action_disc,dir_path,max_steps,trial)
 	fig, ax = plt.subplots(2,1,figsize=(5,7)) 
 	# ax.set_aspect('equal')
@@ -483,15 +483,15 @@ def continuous():
 	batchsize = 1 # number of samples at each step
 	action_num = 2 # dimension of action space (not including 0)
 	action_disc = 0.25 # centered at 0, steps of this to either side
-	max_steps = 10000
+	max_steps = 100
 	trial = 1
 	
 	local_path = os.path.join(dir_path,'sarsa_cont_results_{}'.format(trial))
 	if 'sarsa_cont_results_{}'.format(trial) in os.listdir(dir_path):
 		rmtree('sarsa_cont_results_{}'.format(trial)) # only turn on if need to do again
-	os.mkdir(local_path)
+	os.mkdir(local_path, 755)
 	os.chdir(local_path)
-	weights,rewards_store,states_store,actions_store,weights_store = semigradient_sarsa_continous(Samples,attributes,Hueristic_tr,alpha,beta,gamma,epsilon,batchsize,action_num,action_disc,dir_path,max_steps,trial)
+	weights,rewards_store,avg_rewards,states_store,actions_store,weights_store = semigradient_sarsa_continuous(Samples,attributes,Hueristic_tr,alpha,beta,gamma,epsilon,batchsize,action_num,action_disc,dir_path,max_steps,trial)
 	fig, ax = plt.subplots(2,1,figsize=(5,7)) 
 	# ax.set_aspect('equal')
 
