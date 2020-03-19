@@ -117,7 +117,7 @@ def q_grad_linear(state, action_indx, action_stp, x_sample):
 def next_action(state_val, action_step):
 	state_next = state_val + action_step
 	if state_next < 0:
-		return action_step + state_next
+		return action_step - state_next
 	elif state_next > 10:
 		return action_step - (state_next-10)
 	else:
@@ -221,19 +221,19 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
 
 				q = q_linear(weights, state, action_index, action, x_samp)
 				q_prime = q_linear(weights, state_prime, action_prime_index, action_prime, x_samp)
-				print(q_prime-q,reward)
+#				print(q_prime-q, 'qp - q',reward, 'reward')
 
 				q_grad = q_grad_linear(state, action_index, action, x_samp)
 				weights[action_index] = np.add(weights[action_index],alpha_func*np.multiply(reward + gamma * np.subtract(q_prime,q),q_grad))
 				
 				state = state_prime.copy()
-				print(state)
+#				print(state)
 				states.append(state.copy())
 	
 				action = action_prime
 				action_index = action_prime_index
 				action_vect[action_index] = action
-				print(action_vect)
+#				print(action_vect, 'action vect')
 				actions.append(action_vect.copy())
 	
 			else:
@@ -290,11 +290,11 @@ def batch():
 	max_steps = 1000
 	trial = 1
 	
-	local_path = os.path.join(dir_path,'sarsa_batch_results_{}'.format(trial))
-	if 'sarsa_batch_results_{}'.format(trial) in os.listdir(dir_path):
-		rmtree('sarsa_batch_results_{}'.format(trial)) # only turn on if need to do again
-	os.mkdir(local_path)
-	os.chdir(local_path)
+#	local_path = os.path.join(dir_path,'sarsa_batch_results_{}'.format(trial))
+#	if 'sarsa_batch_results_{}'.format(trial) in os.listdir(dir_path):
+#		rmtree('sarsa_batch_results_{}'.format(trial)) # only turn on if need to do again
+#	os.mkdir(local_path, 75)
+#	os.chdir(local_path)
 	weights,rewards_store,states_store,actions_store,weights_store = semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_tr,alpha,gamma,epsilon,batchsize,action_num,action_disc,dir_path,max_steps,trial)
 	fig, ax = plt.subplots(2,1,figsize=(5,7)) 
 	# ax.set_aspect('equal')
