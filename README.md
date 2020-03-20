@@ -1,17 +1,15 @@
 # path-finding
 This is a repository for a class project in reinforcement learning.
 
-### Run the file RL_testbed_draft.py from the same directory as the following: 
-1. All_Samples_001 (data folder)
-2. Sample_A (data folder)
-3. PercolationThresholds.txt (data file)
+## Data can be found here:
+
+
+### Run the file RL_testbed_final.py from the same directory as the following: 
+1. Sample_A (data folder) 
+2. heuristic_info_all_samples.csv
 
 Creates a folder for results (pickled dictionary) and figs based on a trial number. The trial number is also taken as the random seed.
 
-### Kind of working but not correct:
+### Two algorithms implemented:
 1. Episodic semigradient SARSA (Sutton and Barto, pg. 244) - with linear approximation function 
-
-### To do:
-2. Episodic semigradient SARSA (Sutton and Barto, pg. 244) - with neural approximation function
-3. Continuous semigradient SARSA (Sutton and Barto, pg. 251) - with linear approximation function
-4. Continuous semigradient SARSA (Sutton and Barto, pg. 251) - with neural approximation function
+2. Continuous semigradient SARSA (Sutton and Barto, pg. 251) - with linear approximation function
