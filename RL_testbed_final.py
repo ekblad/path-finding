@@ -184,7 +184,7 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
 			reward = shortest_path(state_prime, sample_batch, Hueristic_df, attributes, dir_path) #change this to -(1-Accuracy) (i.e. minimize loss)
 			rewards.append(reward)
 
-			if any(action_vect != 0): # checking action for termination criteria is same as checking state it takes you to
+			if any(np.abs(action_vect[~np.isnan(action_vect)]) >= 10e-15): # checking action for termination criteria is same as checking state it takes you to
 				term = False
 
 				# epsilon-greedy action selection
@@ -340,30 +340,18 @@ def semigradient_sarsa_continuous(Samples,attributes,Hueristic_df,alpha,beta,gam
 	
 	action_vect = np.full((num_attributes,), np.nan)    
 	action_index = np.random.randint(num_attributes)
-	# nextactions = next_actions(state, action_index, action_mags, action_disc)
-	# action_step = np.random.choice(nextactions[~np.isnan(nextactions)]).astype(np.int) # random init. action
+
 	action_step = np.random.choice(action_mags)*action_disc		
 	action = next_action(state[action_index],action_step)
 
-	# action_vect[action_index] = action_step*nextaction
 	action_vect[action_index] = action
 	actions_store[i] = action_vect.copy()
-
-	# if episode > 0: 
-	# 	action_disc = action_disc/episode # anneal action discretization
-
 
 	epsilon_func = epsilon
 	alpha_func = alpha
 	
 	while term == False:
 		term = True 
-
-
-		# annealing
-		# action_disc -= 1/max_steps
-		# epsilon_func -= 1/max_steps #epsilon is the amount of random exploration
-		# alpha_func -= 1/max_steps
 
 		#collect feature data for random samples            
 		sample_batch = np.random.choice(Samples,batchsize, replace = False) # draw batchsize random samples          
@@ -374,10 +362,10 @@ def semigradient_sarsa_continuous(Samples,attributes,Hueristic_df,alpha,beta,gam
 		state_prime[action_index] = state_prime[action_index] + action
 
 		#determine and store reward for the given state and samples 
-		reward = shortest_path(state_prime, sample_batch, Hueristic_df, attributes, dir_path) #change this to -(1-Accuracy) (i.e. minimize loss)
+		reward = shortest_path(state_prime, sample_batch, Hueristic_df, attributes, dir_path)
 		rewards_store[i] = reward
 		i += 1
-		if any(action_vect != 0): # checking action for termination criteria is same as checking state it takes you to
+		if any(np.abs(action_vect[~np.isnan(action_vect)]) >= 10e-15): # checking action for termination criteria is same as checking state it takes you to
 			term = False
 
 			# epsilon-greedy action selection
@@ -385,21 +373,14 @@ def semigradient_sarsa_continuous(Samples,attributes,Hueristic_df,alpha,beta,gam
 				action_prime_index = np.random.randint(num_attributes)
 				action_prime_step = np.random.choice(action_mags)*action_disc	
 				action_prime = next_action(state_prime[action_prime_index], action_prime_step)
-				# action_prime_step = np.random.choice(nextactions[~np.isnan(nextactions)]).astype(np.int) # random init. action
-				# action_vect[action_prime_index] = action_prime_step
 			else:
 				q_enum = np.zeros((num_attributes,len(action_mags)))
 				action_prime_store = np.zeros((num_attributes,len(action_mags)))
 				for j in range(num_attributes):
-					# nextactions = next_actions(state_prime, j, action_mags, action_disc)
 					for k,mag in enumerate(action_mags*action_disc):
 						action_prime = next_action(state_prime[j], mag)
 						action_prime_store[j,k] = action_prime
 						q_enum[j,k] = q_linear(weights,state_prime,j,action_prime,x_samp)
-						# if direction == np.nan:
-						# 	q_enum[j,k] = np.nan
-						# else:
-						# 	q_enum[j,k] = np.sum(q_linear(weights,state_prime,j,direction,x_samp))
 
 				#find max values
 				max_values = [(q_enum[j,k], action_prime_store[j,k], j) for k in range(len(action_mags)) for j in range(num_attributes) if q_enum[j,k] == np.nanmax(q_enum)]
@@ -414,35 +395,22 @@ def semigradient_sarsa_continuous(Samples,attributes,Hueristic_df,alpha,beta,gam
 
 			q = q_linear(weights, state, action_index, action, x_samp)
 			q_prime = q_linear(weights, state_prime, action_prime_index, action_prime, x_samp)
-			print(q_prime-q,reward)
 
 			delta = reward - avg_rewards[i-1] + q_prime - q
 			avg_rewards[i] = avg_rewards[i-1] + beta*delta
 
 			q_grad = q_grad_linear(state, action_index, action, x_samp)
-			# weights[action_index] = np.add(weights[action_index],alpha_func*np.multiply(reward + gamma * np.subtract(q_prime,q),q_grad))
 			weights[action_index] = weights[action_index] +  alpha_func*delta*q_grad
 			state = state_prime.copy()
-			print(state)
 			states_store[i] = state.copy()
 
 			action = next_action(state[action_prime_index],action_prime)
 			action_index = action_prime_index
 			action_vect[action_index] = action
-			print(action_vect)
 			actions_store[i] = action_vect.copy()
 
-		# else:
-		# 	q = q_linear(weights, state, action_index, action, x_samp)
-		# 	q_grad = q_grad_linear(state, action_index, action, x_samp)
-		# 	weights[action_index] = weights[action_index] + np.multiply(alpha_func*(reward - q),q_grad)
-
-		if i > max_steps: #CHANGE BACK TO 100
+		if i > max_steps:
 			term = True
-
-		# rewards_store[episode] = rewards.copy()
-		# states_store[episode] = states.copy()
-		# actions_store[episode] = actions.copy()
 		weights_store[i] = weights.copy()
 	
 	params = dict(samples=Samples,attributes=attributes,alpha=alpha,gamma=gamma,beta=beta,
@@ -476,46 +444,62 @@ def continuous():
 
 	#algorithm parameters
 	attributes = ['ArcLength', 'MeanWidth', 'LongandThick', 'Curvature', 'Connectivity']
-	alpha = 0.1 # initial step size for each episode
+	alpha = 0.2 # initial step size for each episode
 	beta = 0.1 # average update size
 	gamma = 1 # undiscounted
-	epsilon = 0.1
-	batchsize = 1 # number of samples at each step
-	action_num = 2 # dimension of action space (not including 0)
-	action_disc = 0.25 # centered at 0, steps of this to either side
-	max_steps = 100
-	trial = 1
+	epsilon = 0.2
+	batchsize = 30 # number of samples at each step
+	action_num = 4 # dimension of action space (not including 0)
+	action_disc = 0.2 # centered at 0, steps of this to either side
+	max_steps = 1000
+	trial = 12
 	
 	local_path = os.path.join(dir_path,'sarsa_cont_results_{}'.format(trial))
 	if 'sarsa_cont_results_{}'.format(trial) in os.listdir(dir_path):
 		rmtree('sarsa_cont_results_{}'.format(trial)) # only turn on if need to do again
-	os.mkdir(local_path, 755)
+	# os.mkdir(local_path, 755)
+	os.mkdir(local_path)
 	os.chdir(local_path)
 	weights,rewards_store,avg_rewards,states_store,actions_store,weights_store = semigradient_sarsa_continuous(Samples,attributes,Hueristic_tr,alpha,beta,gamma,epsilon,batchsize,action_num,action_disc,dir_path,max_steps,trial)
 	fig, ax = plt.subplots(2,1,figsize=(5,7)) 
-	# ax.set_aspect('equal')
 
-	attr_plot  = [states_store[i][-1] for i in states_store]
-	a_store = pd.DataFrame(attr_plot,columns=attributes)
+	a_store = pd.DataFrame.from_dict(states_store,orient='index')
+	a_store.columns = attributes	
 	w_store = pd.DataFrame.from_dict(weights_store,orient='index')
 	w_store.columns = attributes
-	# print(w_store.shape)
+
 	for i in w_store.columns:
-		# print(w_store[:,:,i])
-		ax[0].scatter(np.arange(0,len(w_store)),w_store[i],label=i)
-		ax[1].scatter(np.arange(0,len(a_store)),a_store[i],label=i)
-	# ax.set_ylim(0,30)
+		ax[0].plot(np.arange(0,len(w_store)),w_store[i],label=i)
+		ax[1].plot(np.arange(0,len(a_store)),a_store[i],label=i)
+
 	ax[1].set_xlabel('Steps')
 	ax[0].set_ylabel('q_hat Weights')
 	ax[1].set_ylabel('Attribute Weights')
 	handles, labels = ax[1].get_legend_handles_labels()
 	fig.legend(handles=handles,labels=labels,frameon=False,bbox_to_anchor=(1.35,0.5),loc='right')
 	plt.savefig('weighting_scheme.png',format='png',bbox_inches='tight',dpi=300)
+
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+
+	r_store = pd.DataFrame.from_dict(rewards_store,orient='index')
+	r_store.columns = ['Rewards']	
+	ra_store = pd.DataFrame.from_dict(avg_rewards,orient='index')
+	ra_store.columns = ['Average Rewards']
+
+	r_store.plot(y='Rewards',kind='line',ax=ax)
+	ra_store.plot(y='Average Rewards',kind='line',ax=ax)
+
+	ax.set_xlabel('Steps')
+	ax.set_ylabel('Reward')
+
+	plt.savefig('rewards.png',format='png',bbox_inches='tight',dpi=300)
+
 	os.chdir(dir_path)
 	toc = time.time()
 	print('runtime = ', toc - tic)
 
 if __name__ == '__main__':
-	batch()
+	# batch()
 	continuous()
 
