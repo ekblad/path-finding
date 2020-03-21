@@ -13,7 +13,7 @@ from shutil import rmtree
 np.random.seed(seed=15)
 
 def shortest_path(weighting_scheme, samples, Hueristic_df, attributes,dir_path):
-#    print(weighting_scheme)
+
 	#initialize variables
 	num_samples = len(samples)
 	accuracy = np.zeros(num_samples)
@@ -25,7 +25,6 @@ def shortest_path(weighting_scheme, samples, Hueristic_df, attributes,dir_path):
 		#determine edge weights from weighting scheme
 		sample_hueristics = Hueristic_df.loc[Hueristic_df['SampleName'] == sample, attributes].iloc[0::2].values
 		edge_weights = np.sum(weighting_scheme.T*sample_hueristics, axis = 1)
-#        print(min(edge_weights))
 		num_edges = len(edge_weights)
 
 		sample_nodes = Hueristic_df.loc[Hueristic_df['SampleName'] == sample,'nodeID'].values.astype(np.int)
@@ -99,20 +98,7 @@ def q_grad_linear(state, action_indx, action_stp, x_sample):
 	state_fn = np.copy(state)
 	state_fn[action_indx] = state_fn[action_indx] + action_stp
 	ret_grad = np.mean(np.array([np.inner(state_fn,np.mean(samp,axis=0)) for samp in x_sample]))
-	return ret_grad
-
-# def next_actions(state, action_index, action_mags, action_disc):
-# 	actions = action_mags.copy()*action_disc
-# 	if state[action_index] == 10: 
-# 		actions[-1] = np.nan
-# 	elif state[action_index] == 0: 
-# 		actions[0] = np.nan
-# 	elif state[action_index] + actions[-1] > 10:
-# 		actions[-1] = 10 - state[action_index]
-# 		print('over 10', actions,  state[action_index], action_index)
-# 	elif state[action_index] + actions[0] < 0: 
-# 		actions[0] = -state[action_index]
-# 	return actions    
+	return ret_grad 
 
 def next_action(state_val, action_step):
 	state_next = state_val + action_step
@@ -123,12 +109,13 @@ def next_action(state_val, action_step):
 	else:
 		return action_step
 
-def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamma,epsilon,batchsize,action_num,action_disc,dir_path,max_steps=100,trial=0):    
+def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamma,epsilon,batchsize,action_num,action_disc,dir_path,max_steps,trial):    
 	np.random.seed(seed=trial)
 	rewards_store = {}
 	states_store = {}
 	actions_store = {}
 	weights_store = {}
+	weight_track = []
 	action_mags = np.arange(int(-action_num/2),int(action_num/2)+1) # e.g. [-1.  0.  1.]  
 	num_attributes = len(attributes)
 
@@ -140,22 +127,19 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
 		rewards = []
 		states = []
 		actions = []
+
 		state = np.random.uniform(0,10,num_attributes) #random initial state
 		states.append(state.copy())
 		
 		action_vect = np.full((num_attributes,), np.nan)    
 		action_index = np.random.randint(num_attributes)
-		# nextactions = next_actions(state, action_index, action_mags, action_disc)
-		# action_step = np.random.choice(nextactions[~np.isnan(nextactions)]).astype(np.int) # random init. action
-		action_step = np.random.choice(action_mags)*action_disc		
+
+		action_step = np.random.choice(action_mags)*action_disc        
 		action = next_action(state[action_index],action_step)
 
 		# action_vect[action_index] = action_step*nextaction
 		action_vect[action_index] = action
 		actions.append(action_vect.copy())
-
-		# if episode > 0: 
-		# 	action_disc = action_disc/episode # anneal action discretization
 
 		i = 0  #reset step count
 		epsilon_func = epsilon
@@ -165,11 +149,6 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
 			term = True 
 			i += 1
 
-			# annealing
-			# action_disc -= 1/max_steps
-			# epsilon_func -= 1/max_steps #epsilon is the amount of random exploration
-			# alpha_func -= 1/max_steps
-
 			#collect feature data for random samples            
 			sample_batch = np.random.choice(Samples,batchsize, replace = False) # draw batchsize random samples          
 			x_samp = [Hueristic_df.loc[Hueristic_df['SampleName']==sample, attributes].values[0::2,] for sample in sample_batch]
@@ -178,35 +157,26 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
 			state_prime = state.copy()
 			state_prime[action_index] = state_prime[action_index] + action
 
-			#determine and store reward for the given state and samples 
-			print(state_prime,sample_batch)
-
+			#determine and store reward for the given state and samples
 			reward = shortest_path(state_prime, sample_batch, Hueristic_df, attributes, dir_path) #change this to -(1-Accuracy) (i.e. minimize loss)
 			rewards.append(reward)
 
-			if any(np.abs(action_vect[~np.isnan(action_vect)]) >= 10e-15): # checking action for termination criteria is same as checking state it takes you to
+			if any(np.abs(action_vect[~np.isnan(action_vect)]) >= 10e-15) or any(np.isnan(action_vect)): # checking action for termination criteria is same as checking state it takes you to
 				term = False
 
 				# epsilon-greedy action selection
 				if np.random.random_sample() < epsilon_func:
 					action_prime_index = np.random.randint(num_attributes)
-					action_prime_step = np.random.choice(action_mags)*action_disc	
+					action_prime_step = np.random.choice(action_mags)*action_disc    
 					action_prime = next_action(state_prime[action_prime_index], action_prime_step)
-					# action_prime_step = np.random.choice(nextactions[~np.isnan(nextactions)]).astype(np.int) # random init. action
-					# action_vect[action_prime_index] = action_prime_step
 				else:
 					q_enum = np.zeros((num_attributes,len(action_mags)))
 					action_prime_store = np.zeros((num_attributes,len(action_mags)))
 					for j in range(num_attributes):
-						# nextactions = next_actions(state_prime, j, action_mags, action_disc)
 						for k,mag in enumerate(action_mags*action_disc):
 							action_prime = next_action(state_prime[j], mag)
 							action_prime_store[j,k] = action_prime
 							q_enum[j,k] = q_linear(weights,state_prime,j,action_prime,x_samp)
-							# if direction == np.nan:
-							# 	q_enum[j,k] = np.nan
-							# else:
-							# 	q_enum[j,k] = np.sum(q_linear(weights,state_prime,j,direction,x_samp))
 
 					#find max values
 					max_values = [(q_enum[j,k], action_prime_store[j,k], j) for k in range(len(action_mags)) for j in range(num_attributes) if q_enum[j,k] == np.nanmax(q_enum)]
@@ -221,29 +191,28 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
 
 				q = q_linear(weights, state, action_index, action, x_samp)
 				q_prime = q_linear(weights, state_prime, action_prime_index, action_prime, x_samp)
-#				print(q_prime-q, 'qp - q',reward, 'reward')
 
 				q_grad = q_grad_linear(state, action_index, action, x_samp)
 				weights[action_index] = np.add(weights[action_index],alpha_func*np.multiply(reward + gamma * np.subtract(q_prime,q),q_grad))
 				
 				state = state_prime.copy()
-#				print(state)
 				states.append(state.copy())
 	
 				action = action_prime
 				action_index = action_prime_index
 				action_vect[action_index] = action
-#				print(action_vect, 'action vect')
 				actions.append(action_vect.copy())
 	
 			else:
 				q = q_linear(weights, state, action_index, action, x_samp)
 				q_grad = q_grad_linear(state, action_index, action, x_samp)
 				weights[action_index] = weights[action_index] + np.multiply(alpha_func*(reward - q),q_grad)
+				term = True
 	
 			if i > max_steps: #CHANGE BACK TO 100
 				term = True
-
+			weight_track.append(weights.copy())
+			
 		rewards_store[episode] = rewards.copy()
 		states_store[episode] = states.copy()
 		actions_store[episode] = actions.copy()
@@ -253,12 +222,12 @@ def semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_df,alpha,gamm
 					epsilon=epsilon,batchsize=batchsize,action_num=action_num,action_disc=action_disc,
 					max_steps=max_steps,trial=trial)
 	
-	results = dict(rewards=rewards_store,states=states_store,actions=actions_store,weights=weights_store,params=params)
+	results = dict(rewards=rewards_store,states=states_store,actions=actions_store,weights=weights_store,weight_track = weight_track, params=params)
 	with open('sarsa_batch_results_{}.pickle'.format(trial), 'wb') as f:
 		# Pickle the results dictionary using the highest protocol available.
 		pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
 
-	return weights,rewards_store,states_store,actions_store,weights_store # all indexed/keyed by episode int
+	return weight_track,rewards_store,states_store,actions_store,weights_store # all indexed/keyed by episode int
 
 def batch():
 	tic = time.time()
@@ -279,39 +248,48 @@ def batch():
 	Samples = Hueristic_tr['SampleName'].unique()
 
 	#algorithm parameters
-	episodes = 100 # number of episodes
+	episodes = 15 # number of episodes
 	attributes = ['ArcLength', 'MeanWidth', 'LongandThick', 'Curvature', 'Connectivity']
-	alpha = 0.1 # initial step size for each episode
+	alpha = 0.2 # initial step size for each episode
 	gamma = 1 # undiscounted
-	epsilon = 0.1
-	batchsize = 1 # number of samples at each step
-	action_num = 2 # dimension of action space (not including 0)
-	action_disc = 0.25 # centered at 0, steps of this to either side
+	epsilon = 0.2
+	batchsize = 4 # number of samples at each step
+	action_num = 4 # dimension of action space (not including 0)
+	action_disc = 0.5 # centered at 0, steps of this to either side
 	max_steps = 1000
-	trial = 1
+	trial = 12
 	
 	local_path = os.path.join(dir_path,'sarsa_batch_results_{}'.format(trial))
 	if 'sarsa_batch_results_{}'.format(trial) in os.listdir(dir_path):
 		rmtree('sarsa_batch_results_{}'.format(trial)) # only turn on if need to do again
-	os.mkdir(local_path, 755)
+	# os.mkdir(local_path, 755)
+	os.mkdir(local_path)
 	os.chdir(local_path)
-	weights,rewards_store,states_store,actions_store,weights_store = semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_tr,alpha,gamma,epsilon,batchsize,action_num,action_disc,dir_path,max_steps,trial)
-	fig, ax = plt.subplots(2,1,figsize=(5,7)) 
-	# ax.set_aspect('equal')
-
+	weights_tracker,rewards_store,states_store,actions_store,weights_store = semigradient_sarsa_batch(episodes,Samples,attributes,Hueristic_tr,alpha,gamma,epsilon,batchsize,action_num,action_disc,dir_path,max_steps,trial)
+	fig, ax = plt.subplots(4,1,figsize=(5,10)) 
+	state_tracker = []
+	for i in range(episodes):
+		state_tracker +=states_store[i] 
 	attr_plot  = [states_store[i][-1] for i in states_store]
 	a_store = pd.DataFrame(attr_plot,columns=attributes)
+	s_track_store = pd.DataFrame(state_tracker,columns=attributes)
+	w_track_store = pd.DataFrame(weights_tracker,columns=attributes)
 	w_store = pd.DataFrame.from_dict(weights_store,orient='index')
 	w_store.columns = attributes
-	# print(w_store.shape)
+
 	for i in w_store.columns:
-		# print(w_store[:,:,i])
 		ax[0].scatter(np.arange(0,len(w_store)),w_store[i],label=i)
 		ax[1].scatter(np.arange(0,len(a_store)),a_store[i],label=i)
-	# ax.set_ylim(0,30)
+		ax[2].scatter(np.arange(0,len(w_track_store)),w_track_store[i],label=i)
+		ax[3].scatter(np.arange(0,len(s_track_store)),s_track_store[i],label=i)
+
 	ax[1].set_xlabel('Episodes')
+	ax[3].set_xlabel('Steps')
 	ax[0].set_ylabel('q_hat Weights')
 	ax[1].set_ylabel('Attribute Weights')
+	ax[2].set_ylabel('q_hat Weights')
+	ax[3].set_ylabel('Attribute Weights')
+	
 	handles, labels = ax[1].get_legend_handles_labels()
 	fig.legend(handles=handles,labels=labels,frameon=False,bbox_to_anchor=(1.35,0.5),loc='right')
 	plt.savefig('weighting_scheme.png',format='png',bbox_inches='tight',dpi=300)
@@ -352,6 +330,7 @@ def semigradient_sarsa_continuous(Samples,attributes,Hueristic_df,alpha,beta,gam
 	
 	while term == False:
 		term = True 
+		print(i,action_vect)
 
 		#collect feature data for random samples            
 		sample_batch = np.random.choice(Samples,batchsize, replace = False) # draw batchsize random samples          
@@ -365,7 +344,7 @@ def semigradient_sarsa_continuous(Samples,attributes,Hueristic_df,alpha,beta,gam
 		reward = shortest_path(state_prime, sample_batch, Hueristic_df, attributes, dir_path)
 		rewards_store[i] = reward
 		i += 1
-		if any(np.abs(action_vect[~np.isnan(action_vect)]) >= 10e-15): # checking action for termination criteria is same as checking state it takes you to
+		if any(np.abs(action_vect[~np.isnan(action_vect)]) >= 10e-15) or any(np.isnan(action_vect)): # checking action for termination criteria is same as checking state it takes you to
 			term = False
 
 			# epsilon-greedy action selection
@@ -448,7 +427,7 @@ def continuous():
 	beta = 0.1 # average update size
 	gamma = 1 # undiscounted
 	epsilon = 0.2
-	batchsize = 30 # number of samples at each step
+	batchsize = 1 # number of samples at each step
 	action_num = 4 # dimension of action space (not including 0)
 	action_disc = 0.2 # centered at 0, steps of this to either side
 	max_steps = 1000
