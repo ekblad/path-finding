@@ -2,7 +2,7 @@
 This is a repository for a class project in reinforcement learning.
 
 ## Data can be found here:
-[here](https://drive.google.com/drive/folders/13a9KV83qzcuvzcp1D21rtZk1au6wvNNy?usp=sharing "UC Davis data access")
+[UC Davis Google Drive Data Access](https://drive.google.com/drive/folders/13a9KV83qzcuvzcp1D21rtZk1au6wvNNy?usp=sharing "UC Davis data access")
 
 ### Run the file RL_testbed_final.py from the same directory as the following: 
 1. Sample_A (data folder) 
