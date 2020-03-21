@@ -1,7 +1,7 @@
 # path-finding
 This is a repository for a class project in reinforcement learning.
 
-Contributors:
+Contributors:  
 Zoe Kanavas (zkanavas@ucdavis.edu)  
 Erin Musabandesu (enmusabandesu@ucdavis.edu)  
 Liam Lynch (wdlynch@ucdavis.edu)  
